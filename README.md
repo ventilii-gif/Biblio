@@ -30,16 +30,15 @@ restano **sul tuo dispositivo**.
 
 La fotocamera funziona **solo su HTTPS**: il modo più semplice è pubblicare il
 sito su GitHub Pages, che fornisce HTTPS gratuito. Il workflow incluso
-(`.github/workflows/deploy.yml`) **abilita e pubblica Pages da solo** a ogni
-aggiornamento del ramo `main`.
+(`.github/workflows/deploy.yml`) pubblica il sito a ogni aggiornamento di `main`.
 
-1. Apri la scheda **Actions** del repository e attendi che il workflow
-   *"Pubblica su GitHub Pages"* diventi verde (parte a ogni push su `main`).
-2. Apri l'indirizzo pubblicato: `https://<tuo-utente>.github.io/Biblio/`.
-
-> Se l'abilitazione automatica non fosse consentita dalle impostazioni del tuo
-> account, attivala a mano una volta sola: **Settings → Pages → Source:
-> "GitHub Actions"**, poi riavvia il workflow da **Actions → Run workflow**.
+1. **Una sola volta**, attiva Pages: **Settings → Pages** → alla voce *Build and
+   deployment* scegli **Source: "GitHub Actions"**. (È un passaggio manuale
+   perché GitHub non permette al workflow di attivarlo da sé.)
+2. Riavvia la pubblicazione: **Actions → "Pubblica su GitHub Pages" → Run
+   workflow** (oppure fai un qualsiasi nuovo push su `main`).
+3. A workflow verde, apri l'indirizzo pubblicato:
+   `https://<tuo-utente>.github.io/Biblio/`.
 
 ### 2. In locale (per prova)
 

@@ -28,11 +28,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configura Pages
+        # Nota: GitHub Pages va attivato una volta sola nelle impostazioni del
+        # repository (Settings -> Pages -> Source: "GitHub Actions"). Il token
+        # del workflow non ha il permesso di attivarlo automaticamente.
         uses: actions/configure-pages@v5
-        with:
-          # Abilita automaticamente GitHub Pages (modalità "GitHub Actions")
-          # così non serve attivarlo a mano nelle impostazioni del repository.
-          enablement: true
 
       - name: Carica il sito
         uses: actions/upload-pages-artifact@v3

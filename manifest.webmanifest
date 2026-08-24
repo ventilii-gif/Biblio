@@ -1,0 +1,20 @@
+{
+  "name": "Biblio — la tua biblioteca di casa",
+  "short_name": "Biblio",
+  "description": "Scansiona il codice a barre dei tuoi libri, recupera i dati e organizzali per scaffale.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5efe6",
+  "theme_color": "#7c4a2d",
+  "lang": "it",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

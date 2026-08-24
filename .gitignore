@@ -1,0 +1,10 @@
+# Dipendenze / strumenti (l'app è statica, non ne richiede)
+node_modules/
+package-lock.json
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

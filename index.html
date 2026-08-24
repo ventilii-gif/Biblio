@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#7c4a2d" />
+  <meta name="description" content="Gestisci la tua biblioteca di casa: scansiona il codice a barre dei libri e assegna uno scaffale." />
+  <title>Biblio — la tua biblioteca di casa</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">📚</span>
+      <div>
+        <h1>Biblio</h1>
+        <p class="tagline">La tua biblioteca di casa</p>
+      </div>
+    </div>
+    <div class="counter" id="counter" title="Libri in biblioteca">0 libri</div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="scan" role="tab" aria-selected="true">📷 Scansiona</button>
+    <button class="tab" data-tab="library" role="tab" aria-selected="false">📚 Biblioteca</button>
+  </nav>
+
+  <main>
+    <!-- ===================== TAB: SCANSIONA ===================== -->
+    <section id="tab-scan" class="tab-panel active" role="tabpanel">
+
+      <div class="card scanner-card">
+        <div class="scanner" id="scanner">
+          <video id="video" playsinline muted></video>
+          <div class="scan-overlay" id="scanOverlay">
+            <div class="scan-frame"></div>
+            <p class="scan-hint">Inquadra il codice a barre sul retro del libro</p>
+          </div>
+          <div class="scanner-placeholder" id="scannerPlaceholder">
+            <span class="ph-icon">📷</span>
+            <p>Premi <strong>Avvia scansione</strong> per accendere la fotocamera</p>
+          </div>
+        </div>
+
+        <div class="scanner-controls">
+          <button id="startBtn" class="btn btn-primary">▶ Avvia scansione</button>
+          <button id="stopBtn" class="btn btn-ghost hidden">■ Ferma</button>
+          <button id="torchBtn" class="btn btn-ghost hidden" title="Torcia">🔦</button>
+          <select id="cameraSelect" class="camera-select hidden" title="Cambia fotocamera" aria-label="Cambia fotocamera"></select>
+        </div>
+
+        <p class="scanner-status" id="scannerStatus"></p>
+
+        <div class="manual-entry">
+          <label for="manualIsbn">Oppure inserisci l'ISBN a mano</label>
+          <div class="manual-row">
+            <input type="text" id="manualIsbn" inputmode="numeric" placeholder="es. 9788804707982" autocomplete="off" />
+            <button id="manualBtn" class="btn btn-secondary">Cerca</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scheda risultato / inserimento -->
+      <div class="card result-card hidden" id="resultCard">
+        <div class="result-loading hidden" id="resultLoading">
+          <div class="spinner"></div>
+          <p>Cerco i dati del libro…</p>
+        </div>
+
+        <div class="result-body hidden" id="resultBody">
+          <div class="book-preview">
+            <img id="bookCover" class="book-cover" alt="Copertina" />
+            <div class="book-fields">
+              <label>Titolo
+                <input type="text" id="fTitle" placeholder="Titolo del libro" />
+              </label>
+              <label>Autore/i
+                <input type="text" id="fAuthors" placeholder="Autore" />
+              </label>
+              <div class="field-grid">
+                <label>Editore
+                  <input type="text" id="fPublisher" placeholder="Editore" />
+                </label>
+                <label>Anno
+                  <input type="text" id="fYear" placeholder="Anno" inputmode="numeric" />
+                </label>
+              </div>
+              <label>ISBN
+                <input type="text" id="fIsbn" placeholder="ISBN" readonly />
+              </label>
+            </div>
+          </div>
+
+          <div class="shelf-section">
+            <label for="fShelf" class="shelf-label">🗂️ Scaffale</label>
+            <input type="text" id="fShelf" list="shelfOptions" placeholder="Scegli o scrivi lo scaffale…" autocomplete="off" />
+            <datalist id="shelfOptions"></datalist>
+            <p class="shelf-help">Scegli uno scaffale già usato dal menù, oppure scrivine uno nuovo: verrà memorizzato.</p>
+          </div>
+
+          <div class="result-actions">
+            <button id="saveBtn" class="btn btn-primary">💾 Salva in biblioteca</button>
+            <button id="scanAnotherBtn" class="btn btn-ghost">↻ Scansiona un altro</button>
+          </div>
+          <p class="dup-note hidden" id="dupNote"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== TAB: BIBLIOTECA ===================== -->
+    <section id="tab-library" class="tab-panel" role="tabpanel">
+      <div class="card">
+        <div class="library-toolbar">
+          <input type="search" id="searchInput" placeholder="🔎 Cerca per titolo, autore o ISBN…" />
+          <div class="toolbar-row">
+            <select id="shelfFilter" aria-label="Filtra per scaffale">
+              <option value="">Tutti gli scaffali</option>
+            </select>
+            <select id="sortSelect" aria-label="Ordina">
+              <option value="recent">Più recenti</option>
+              <option value="title">Titolo A→Z</option>
+              <option value="author">Autore A→Z</option>
+              <option value="shelf">Scaffale</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="library-stats" id="libraryStats"></div>
+      </div>
+
+      <div id="libraryList" class="library-list"></div>
+
+      <div class="empty-state hidden" id="emptyState">
+        <span class="empty-icon">📭</span>
+        <p>La tua biblioteca è vuota.</p>
+        <p class="muted">Vai su <strong>Scansiona</strong> e aggiungi il primo libro!</p>
+      </div>
+
+      <div class="card backup-card">
+        <h3>Backup e dati</h3>
+        <p class="muted">I libri sono salvati solo su questo dispositivo. Esporta un backup per non perderli.</p>
+        <div class="backup-actions">
+          <button id="exportJsonBtn" class="btn btn-secondary">⬇ Esporta (JSON)</button>
+          <button id="exportCsvBtn" class="btn btn-secondary">⬇ Esporta (CSV)</button>
+          <button id="importBtn" class="btn btn-secondary">⬆ Importa</button>
+          <input type="file" id="importFile" accept="application/json,.json" class="hidden" />
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Toast di conferma -->
+  <div class="toast hidden" id="toast"></div>
+
+  <!-- Datalist condivisa per gli scaffali nella biblioteca (modifica inline) -->
+  <datalist id="shelfOptionsLibrary"></datalist>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

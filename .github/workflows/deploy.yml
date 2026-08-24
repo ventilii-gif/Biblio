@@ -1,0 +1,41 @@
+name: Pubblica su GitHub Pages
+
+# Pubblica automaticamente il sito quando il ramo principale viene aggiornato.
+# Attiva GitHub Pages in: Settings → Pages → "Build and deployment" → Source: "GitHub Actions".
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Consente un solo deploy alla volta.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configura Pages
+        uses: actions/configure-pages@v5
+
+      - name: Carica il sito
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Tutti i file statici sono nella radice del repository.
+          path: '.'
+
+      - name: Deploy su Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

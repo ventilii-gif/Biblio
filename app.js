@@ -618,7 +618,16 @@ async function lookupAndShow(isbn) {
     // Il CODICE è stato letto: il problema è solo il recupero dati. Chiariscilo.
     const oc = outcomes.join(' · ');
     if (/limite richieste|429|403/i.test(oc)) {
-      setStatus(`✓ Codice ${isbn} letto. Servizio dati al limite delle richieste: riprova tra un minuto, aggiungi una chiave Google (⚙️ qui sotto) o compila a mano.`, true);
+      setStatus(`✓ Codice ${isbn} letto. Servizio dati al limite delle richieste: aggiungi una chiave Google (⚙️) o riprova tra un minuto; intanto puoi compilare a mano.`, true);
+      // Se non c'è ancora una chiave, apri la sezione ⚙️ e porta l'utente al campo.
+      if (!getGoogleKey()) {
+        const s = document.querySelector('.settings');
+        if (s) {
+          s.open = true;
+          s.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          try { $('#googleKey').focus({ preventScroll: true }); } catch (e) {}
+        }
+      }
     } else if (/HTTP|abort|Failed|network|Load failed/i.test(oc)) {
       setStatus(`✓ Codice ${isbn} letto. Problema di rete nel recupero dati: riprova o compila a mano.`, true);
     } else {

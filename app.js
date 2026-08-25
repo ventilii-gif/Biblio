@@ -109,33 +109,62 @@ function beep() {
    RICERCA DATI DEL LIBRO
    =========================================================== */
 
-async function fetchBookData(isbn) {
-  // 1) Google Books (senza chiave, CORS ok)
-  const google = await fetchFromGoogle(isbn).catch(() => null);
-  // 2) Open Library come completamento/fallback
-  const openlib = await fetchFromOpenLibrary(isbn).catch(() => null);
-
-  if (!google && !openlib) return null;
-
-  // Unisce i risultati, dando priorità a Google e completando con Open Library
-  const g = google || {};
-  const o = openlib || {};
-  return {
-    isbn,
-    title: g.title || o.title || '',
-    authors: g.authors || o.authors || '',
-    publisher: g.publisher || o.publisher || '',
-    year: g.year || o.year || '',
-    cover: g.cover || o.cover || '',
-    pages: g.pages || o.pages || '',
-    categories: g.categories || o.categories || '',
-  };
+/* Fetch con timeout: evita richieste bloccate all'infinito. */
+async function fetchWithTimeout(url, ms = 8000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+  } finally {
+    clearTimeout(t);
+  }
 }
 
-async function fetchFromGoogle(isbn) {
-  const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('google ' + res.status);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Recupera i dati del libro interrogando più cataloghi in parallelo.
+ *  Restituisce { data, outcomes }:
+ *   - data: record del libro (o null se nessuna fonte utile)
+ *   - outcomes: esiti per fonte, usati per spiegare eventuali fallimenti. */
+async function fetchBookData(isbn) {
+  const country = ((navigator.language || 'it').split('-').pop() || 'IT').toUpperCase();
+  const outcomes = [];
+  const onErr = (name) => (e) => { outcomes.push(`${name}: ${(e && e.message) || 'errore'}`); return null; };
+
+  const [g, olData, olSearch] = await Promise.all([
+    fetchFromGoogle(isbn, country).catch(onErr('Google')),
+    fetchFromOpenLibraryData(isbn).catch(onErr('OpenLibrary')),
+    fetchFromOpenLibrarySearch(isbn).catch(onErr('OL-Search')),
+  ]);
+
+  if (![g, olData, olSearch].some(Boolean)) return { data: null, outcomes };
+
+  // Unisce i campi dalle fonti, con priorità Google > OL data > OL search.
+  const pick = (k) => (g && g[k]) || (olData && olData[k]) || (olSearch && olSearch[k]) || '';
+  const data = {
+    isbn,
+    title: pick('title'),
+    authors: pick('authors'),
+    publisher: pick('publisher'),
+    year: pick('year'),
+    cover: pick('cover') || `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`,
+    pages: pick('pages'),
+    categories: pick('categories'),
+  };
+  if (!data.title) return { data: null, outcomes: outcomes.length ? outcomes : ['nessun catalogo ha questo ISBN'] };
+  return { data, outcomes };
+}
+
+async function fetchFromGoogle(isbn, country) {
+  const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}&country=${country}&maxResults=1`;
+  let res = await fetchWithTimeout(url);
+  // Riprova una volta in caso di limite richieste o errore temporaneo del server.
+  if (res.status === 429 || res.status === 403 || res.status >= 500) {
+    await sleep(800);
+    res = await fetchWithTimeout(url);
+  }
+  if (res.status === 429 || res.status === 403) throw new Error('limite richieste (' + res.status + ')');
+  if (!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
   if (!data.items || !data.items.length) return null;
   const v = data.items[0].volumeInfo || {};
@@ -154,22 +183,40 @@ async function fetchFromGoogle(isbn) {
   };
 }
 
-async function fetchFromOpenLibrary(isbn) {
+async function fetchFromOpenLibraryData(isbn) {
   const url = `https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('openlib ' + res.status);
+  const res = await fetchWithTimeout(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
-  const key = `ISBN:${isbn}`;
-  const b = data[key];
+  const b = data[`ISBN:${isbn}`];
   if (!b) return null;
   return {
     title: b.title || '',
-    authors: (b.authors || []).map(a => a.name).join(', '),
-    publisher: (b.publishers || []).map(p => p.name).join(', '),
+    authors: (b.authors || []).map((a) => a.name).join(', '),
+    publisher: (b.publishers || []).map((p) => p.name).join(', '),
     year: (b.publish_date || '').match(/\d{4}/) ? b.publish_date.match(/\d{4}/)[0] : '',
     cover: b.cover ? (b.cover.medium || b.cover.large || b.cover.small || '') : '',
     pages: b.number_of_pages || '',
-    categories: (b.subjects || []).slice(0, 3).map(s => s.name).join(', '),
+    categories: (b.subjects || []).slice(0, 3).map((s) => s.name).join(', '),
+  };
+}
+
+/* Open Library Search: spesso trova edizioni che l'API /api/books non espone. */
+async function fetchFromOpenLibrarySearch(isbn) {
+  const url = `https://openlibrary.org/search.json?isbn=${encodeURIComponent(isbn)}&fields=title,author_name,first_publish_year,publisher,cover_i,number_of_pages_median&limit=1`;
+  const res = await fetchWithTimeout(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  const d = data.docs && data.docs[0];
+  if (!d) return null;
+  return {
+    title: d.title || '',
+    authors: (d.author_name || []).join(', '),
+    publisher: (d.publisher || [])[0] || '',
+    year: d.first_publish_year ? String(d.first_publish_year) : '',
+    cover: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : '',
+    pages: d.number_of_pages_median || '',
+    categories: '',
   };
 }
 
@@ -495,7 +542,9 @@ async function lookupAndShow(isbn) {
   body.classList.add('hidden');
   card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  const data = await fetchBookData(isbn).catch((e) => { console.error(e); return null; });
+  const result = await fetchBookData(isbn).catch((e) => { console.error(e); return { data: null, outcomes: ['errore imprevisto: ' + (e && e.message || e)] }; });
+  const data = result && result.data;
+  const outcomes = (result && result.outcomes) || [];
 
   loading.classList.add('hidden');
   body.classList.remove('hidden');
@@ -527,15 +576,27 @@ async function lookupAndShow(isbn) {
   refreshShelfDatalists();
 
   if (!data || !currentBook.title) {
-    setStatus('Dati non trovati automaticamente: completa i campi a mano.', true);
+    // Spiega il motivo del mancato recupero, così è chiaro cosa fare.
+    const oc = outcomes.join(' · ');
+    if (/limite richieste|429|403/i.test(oc)) {
+      setStatus('Servizio dati al limite delle richieste: riprova tra un minuto, oppure compila a mano.', true);
+    } else if (/HTTP|abort|Failed|network|Load failed/i.test(oc)) {
+      setStatus('Problema di rete nel recupero dati: controlla la connessione e riprova, oppure compila a mano.', true);
+    } else {
+      setStatus('Questo ISBN non risulta nei cataloghi gratuiti (Google Books / Open Library): completa i campi a mano.', true);
+    }
+    setDiag(oc ? ('Dettaglio ricerca — ' + oc) : '');
     $('#fTitle').focus();
   } else {
-    setStatus('');
+    setStatus('Dati trovati ✓');
+    setDiag('');
   }
 }
 
 function setCover(imgEl, url) {
   if (url) {
+    imgEl.onerror = () => { imgEl.style.visibility = 'hidden'; };
+    imgEl.onload = () => { imgEl.style.visibility = 'visible'; };
     imgEl.src = url;
     imgEl.style.visibility = 'visible';
   } else {

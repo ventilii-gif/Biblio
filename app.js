@@ -586,10 +586,27 @@ async function lookupAndShow(isbn) {
       setStatus('Questo ISBN non risulta nei cataloghi gratuiti (Google Books / Open Library): completa i campi a mano.', true);
     }
     setDiag(oc ? ('Dettaglio ricerca — ' + oc) : '');
+    setOnlineLookup(isbn, true);
     $('#fTitle').focus();
   } else {
     setStatus('Dati trovati ✓');
     setDiag('');
+    setOnlineLookup(isbn, false);
+  }
+}
+
+/** Mostra/nasconde i link di ricerca online (BookFinder, Google Libri)
+ *  precompilati con l'ISBN corrente. Utile quando il recupero automatico
+ *  non trova il libro: BookFinder non ha un'API interrogabile dal browser,
+ *  ma il link porta direttamente ai risultati per quell'ISBN. */
+function setOnlineLookup(isbn, show) {
+  const box = $('#onlineLookup');
+  if (show && isbn) {
+    $('#linkBookfinder').href = `https://www.bookfinder.com/search/?isbn=${encodeURIComponent(isbn)}&mode=isbn&st=sr&ac=qr&destination=it&currency=EUR&lang=any`;
+    $('#linkGoogleBooks').href = `https://books.google.it/books?vid=ISBN${encodeURIComponent(isbn)}`;
+    box.classList.remove('hidden');
+  } else {
+    box.classList.add('hidden');
   }
 }
 

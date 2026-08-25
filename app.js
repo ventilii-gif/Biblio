@@ -514,9 +514,13 @@ function handleDetection(rawValue) {
   scanner.lastCode = code;
   scanner.lastTime = now;
 
+  // Il codice letto va SEMPRE messo nel campo: non serve mai digitarlo a mano.
+  const manual = $('#manualIsbn');
+  if (manual) manual.value = code;
+
   if (!isValidIsbn(code)) {
-    // La fotocamera legge qualcosa, ma non è un ISBN: aiuta a capire il problema.
-    setDiag(`Letto "${rawValue}" — non è un ISBN. Inquadra il codice EAN‑13 grande (inizia con 978/979), non quello del prezzo.`);
+    // La fotocamera legge qualcosa, ma non sembra un ISBN.
+    setDiag(`Letto "${rawValue}" — non sembra un ISBN valido. L'ho scritto nel campo qui sotto: verificalo e premi «Cerca».`);
     return;
   }
 
@@ -544,9 +548,10 @@ async function decodeFromPhoto(file) {
     const reader = new ZXing.BrowserMultiFormatReader(zxingHints());
     const result = await reader.decodeFromImageUrl(url);
     const code = normalizeIsbn(result.getText());
+    if ($('#manualIsbn')) $('#manualIsbn').value = code; // sempre nel campo
     if (!isValidIsbn(code)) {
       setStatus('', false);
-      setDiag(`Nella foto ho letto "${result.getText()}", ma non è un ISBN valido.`);
+      setDiag(`Nella foto ho letto "${result.getText()}" — non sembra un ISBN valido. L'ho scritto nel campo: verificalo e premi «Cerca».`);
       return;
     }
     beep();

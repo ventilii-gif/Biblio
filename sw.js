@@ -1,8 +1,10 @@
 /* Service worker di Biblio.
-   Mette in cache il "guscio" dell'app per l'uso offline.
+   Strategia "network-first" per i file dell'app: quando c'è connessione
+   viene servita sempre la versione più recente (così gli aggiornamenti
+   arrivano subito), con ricaduta sulla cache quando si è offline.
    Le chiamate alle API dei libri e alle copertine passano sempre dalla rete. */
 
-const CACHE = 'biblio-v2';
+const CACHE = 'biblio-v3';
 const SHELL = [
   './',
   './index.html',
@@ -19,7 +21,8 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -29,18 +32,16 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
-  // Solo le risorse locali (stesso dominio) vengono servite dalla cache.
-  if (url.origin === self.location.origin) {
-    event.respondWith(
-      caches.match(req).then((cached) =>
-        cached ||
-        fetch(req).then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-          return res;
-        }).catch(() => cached)
-      )
-    );
-  }
-  // Le richieste esterne (Google Books, Open Library, copertine, ZXing) restano di rete.
+  if (url.origin !== self.location.origin) return; // esterne: rete diretta
+
+  // Network-first: prova la rete, aggiorna la cache, e usa la cache solo se offline.
+  event.respondWith(
+    fetch(req)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(req).then((cached) => cached || caches.match('./index.html')))
+  );
 });

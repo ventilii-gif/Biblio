@@ -956,9 +956,18 @@ function doManualLookup() {
    SERVICE WORKER (funzionamento offline, installabile)
    =========================================================== */
 function registerSW() {
-  if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (!('serviceWorker' in navigator) || location.protocol !== 'https:') return;
+  // Se un service worker controlla già la pagina, l'arrivo di una nuova
+  // versione (cambio di controllore) applica l'aggiornamento con una ricarica.
+  if (navigator.serviceWorker.controller) {
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
   }
+  navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
 /* ----------------------- Avvio ----------------------- */

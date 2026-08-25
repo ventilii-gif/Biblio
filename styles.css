@@ -272,6 +272,21 @@ main {
 .photo-entry { margin-top: 10px; }
 .photo-entry .btn { width: 100%; font-size: 14px; }
 
+.settings {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.settings summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.settings summary:hover { color: var(--text); }
+.settings p { margin: 8px 0; }
+.settings .manual-row { margin-top: 6px; }
+
 /* ---------- Manual entry ---------- */
 .manual-entry {
   margin-top: 16px;

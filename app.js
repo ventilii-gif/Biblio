@@ -122,11 +122,32 @@ async function fetchWithTimeout(url, ms = 8000) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/* Cache locale dei dati per ISBN: ri-scansionare un libro già visto non fa
+   nuove richieste (aiuta anche a non incappare in "troppe richieste"). */
+const BOOKCACHE_KEY = 'biblio.bookcache';
+function getCachedBook(isbn) {
+  try { const m = JSON.parse(localStorage.getItem(BOOKCACHE_KEY) || '{}'); return m[isbn] || null; }
+  catch (e) { return null; }
+}
+function setCachedBook(isbn, data) {
+  try { const m = JSON.parse(localStorage.getItem(BOOKCACHE_KEY) || '{}'); m[isbn] = data; localStorage.setItem(BOOKCACHE_KEY, JSON.stringify(m)); }
+  catch (e) { /* spazio non disponibile: ignora */ }
+}
+
+/* Chiave API Google Books (opzionale): se impostata, elimina il limite
+   "troppe richieste" delle chiamate senza chiave. */
+const GKEY_KEY = 'biblio.googleKey';
+function getGoogleKey() { try { return (localStorage.getItem(GKEY_KEY) || '').trim(); } catch (e) { return ''; } }
+
 /** Recupera i dati del libro interrogando più cataloghi in parallelo.
  *  Restituisce { data, outcomes }:
  *   - data: record del libro (o null se nessuna fonte utile)
  *   - outcomes: esiti per fonte, usati per spiegare eventuali fallimenti. */
 async function fetchBookData(isbn) {
+  // 1) Cache locale: nessuna richiesta se il libro è già stato trovato prima.
+  const cached = getCachedBook(isbn);
+  if (cached && cached.title) return { data: Object.assign({}, cached, { isbn }), outcomes: ['da cache locale'] };
+
   const country = ((navigator.language || 'it').split('-').pop() || 'IT').toUpperCase();
   const outcomes = [];
   const onErr = (name) => (e) => { outcomes.push(`${name}: ${(e && e.message) || 'errore'}`); return null; };
@@ -152,14 +173,18 @@ async function fetchBookData(isbn) {
     categories: pick('categories'),
   };
   if (!data.title) return { data: null, outcomes: outcomes.length ? outcomes : ['nessun catalogo ha questo ISBN'] };
+  setCachedBook(isbn, data); // memorizza per le volte successive
   return { data, outcomes };
 }
 
 async function fetchFromGoogle(isbn, country) {
-  const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}&country=${country}&maxResults=1`;
+  const key = getGoogleKey();
+  const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}&country=${country}&maxResults=1`
+    + (key ? `&key=${encodeURIComponent(key)}` : '');
   let res = await fetchWithTimeout(url);
-  // Riprova una volta in caso di limite richieste o errore temporaneo del server.
-  if (res.status === 429 || res.status === 403 || res.status >= 500) {
+  // Riprova solo su errori temporanei del server (5xx). NON insistere sul 429:
+  // rifare la richiesta peggiora solo il limite. Si passa alle altre fonti.
+  if (res.status >= 500) {
     await sleep(800);
     res = await fetchWithTimeout(url);
   }
@@ -265,19 +290,15 @@ async function startScanner() {
     videoEl.srcObject = scanner.stream;
     await videoEl.play().catch(() => {});
 
-    // 2) Scegli il decoder: BarcodeDetector nativo se disponibile (veloce),
-    //    altrimenti ZXing incluso (funziona ovunque, iPhone/Safari compresi).
-    if (await nativeSupported()) {
-      scanner.decoder = 'native';
-      scanner.detector = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
-      scanner.engine = 'BarcodeDetector';
-    } else {
-      await loadZXing();
-      scanner.decoder = 'zxing';
-      scanner.zxReader = new ZXing.MultiFormatReader();
-      scanner.zxReader.setHints(zxingHints());
-      scanner.engine = 'ZXing';
-    }
+    // 2) Decoder: ZXing incluso, con lettura per fotogramma su canvas.
+    //    È il metodo dimostrato affidabile su tutti i browser (iPhone/Safari
+    //    compresi); non dipende dal rilevatore nativo, che su alcuni
+    //    dispositivi non legge dal flusso video.
+    await loadZXing();
+    scanner.decoder = 'zxing';
+    scanner.zxReader = new ZXing.MultiFormatReader();
+    scanner.zxReader.setHints(zxingHints());
+    scanner.engine = 'ZXing';
 
     scanner.active = true;
     scannerEl.classList.add('live');
@@ -589,20 +610,21 @@ async function lookupAndShow(isbn) {
   refreshShelfDatalists();
 
   if (!data || !currentBook.title) {
-    // Spiega il motivo del mancato recupero, così è chiaro cosa fare.
+    // Il CODICE è stato letto: il problema è solo il recupero dati. Chiariscilo.
     const oc = outcomes.join(' · ');
     if (/limite richieste|429|403/i.test(oc)) {
-      setStatus('Servizio dati al limite delle richieste: riprova tra un minuto, oppure compila a mano.', true);
+      setStatus(`✓ Codice ${isbn} letto. Servizio dati al limite delle richieste: riprova tra un minuto, aggiungi una chiave Google (⚙️ qui sotto) o compila a mano.`, true);
     } else if (/HTTP|abort|Failed|network|Load failed/i.test(oc)) {
-      setStatus('Problema di rete nel recupero dati: controlla la connessione e riprova, oppure compila a mano.', true);
+      setStatus(`✓ Codice ${isbn} letto. Problema di rete nel recupero dati: riprova o compila a mano.`, true);
     } else {
-      setStatus('Questo ISBN non risulta nei cataloghi gratuiti (Google Books / Open Library): completa i campi a mano.', true);
+      setStatus(`✓ Codice ${isbn} letto. Non è nei cataloghi gratuiti (Google Books / Open Library): completa i campi a mano.`, true);
     }
     setDiag(oc ? ('Dettaglio ricerca — ' + oc) : '');
     setOnlineLookup(isbn, true);
     $('#fTitle').focus();
   } else {
-    setStatus('Dati trovati ✓');
+    const via = outcomes.includes('da cache locale') ? ' (da memoria locale)' : '';
+    setStatus('Dati trovati ✓' + via);
     setDiag('');
     setOnlineLookup(isbn, false);
   }
@@ -943,6 +965,16 @@ function bindEvents() {
   $('#photoInput').addEventListener('change', (e) => {
     if (e.target.files && e.target.files[0]) decodeFromPhoto(e.target.files[0]);
     e.target.value = '';
+  });
+
+  // Chiave Google Books (opzionale)
+  const gk = $('#googleKey');
+  if (gk) gk.value = getGoogleKey();
+  const saveKey = $('#saveKeyBtn');
+  if (saveKey) saveKey.addEventListener('click', () => {
+    const v = ($('#googleKey').value || '').trim();
+    try { localStorage.setItem(GKEY_KEY, v); } catch (e) {}
+    toast(v ? 'Chiave salvata ✓' : 'Chiave rimossa', 'success');
   });
 
   $('#saveBtn').addEventListener('click', saveCurrentBook);

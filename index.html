@@ -66,6 +66,16 @@
             <input type="file" id="photoInput" accept="image/*" capture="environment" class="hidden" />
           </div>
         </div>
+
+        <details class="settings">
+          <summary>⚙️ Chiave Google Books (opzionale)</summary>
+          <p class="muted">Serve solo se vedi spesso «troppe richieste». Con una chiave gratuita il limite sparisce. I dati già trovati vengono comunque memorizzati e non richiesti di nuovo.</p>
+          <div class="manual-row">
+            <input type="text" id="googleKey" placeholder="Incolla qui la chiave (opzionale)" autocomplete="off" />
+            <button id="saveKeyBtn" class="btn btn-secondary" type="button">Salva</button>
+          </div>
+          <p class="muted">Come ottenerla: console.cloud.google.com → nuovo progetto → abilita «Books API» → Credenziali → «Chiave API».</p>
+        </details>
       </div>
 
       <!-- Scheda risultato / inserimento -->

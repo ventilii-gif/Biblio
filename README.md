@@ -13,7 +13,8 @@ restano **sul tuo dispositivo**.
 
 - 📷 **Scansione del codice a barre** (ISBN / EAN-13) dalla fotocamera, con
   torcia e scelta della fotocamera dove disponibili.
-- ⌨️ **Inserimento manuale** dell'ISBN come alternativa alla scansione.
+- ⌨️ **Inserimento manuale** dell'ISBN, oppure **scatta/carica una foto** del
+  codice (utile se la webcam del PC non mette a fuoco).
 - 🔎 **Dati automatici** del libro da *Google Books* e *Open Library*.
 - 🗂️ **Scaffali memorizzati**: il menù a discesa propone quelli già usati, ma
   puoi sempre scriverne uno nuovo.
@@ -64,6 +65,26 @@ l'indirizzo HTTPS di GitHub Pages.
 4. La scansione riparte subito per il libro successivo.
 5. Nella scheda **📚 Biblioteca** trovi tutti i libri, con ricerca e filtri.
 
+## ❓ Se non riconosce i codici
+
+Sotto l'anteprima compare una riga di **diagnostica** che dice cosa sta leggendo
+la fotocamera: usala per capire il problema.
+
+- **Usa il telefono, non la webcam del PC.** Le webcam dei portatili spesso non
+  mettono a fuoco le righe sottili del codice: la fotocamera posteriore del
+  telefono funziona molto meglio.
+- **Distanza e luce:** riempi il riquadro con il codice, tienilo fermo a
+  ~15–25 cm, con buona illuminazione (evita riflessi/ombre).
+- **Inquadra il codice giusto:** l'**EAN‑13** grande (inizia con **978/979**),
+  non il piccolo codice del prezzo accanto.
+- Se la diagnostica dice *«Letto … non è un ISBN»*, stai leggendo il codice
+  sbagliato; se non dice nulla, è un problema di fuoco/luce.
+- **Alternativa sicura:** premi **«Scatta/carica una foto del codice»** e fai
+  una foto nitida — spesso funziona anche quando la ripresa dal vivo fatica.
+- Su **iPhone** apri il sito con **Safari** e consenti la fotocamera.
+- La fotocamera funziona solo su **HTTPS** (o `localhost`): aprendo il file
+  `index.html` direttamente (`file://`) non si attiva.
+
 ## 🔒 Privacy e dati
 
 - I dati della biblioteca sono salvati **solo nel tuo browser** (localStorage),
@@ -76,9 +97,10 @@ l'indirizzo HTTPS di GitHub Pages.
 ## 🛠️ Dettagli tecnici
 
 - Sito statico: `HTML` + `CSS` + `JavaScript`, nessun build necessario.
-- Scansione: API nativa **`BarcodeDetector`** dove disponibile (Android/Chrome),
-  con fallback a **[ZXing](https://github.com/zxing-js/library)** (caricato da
-  CDN) per iPhone/Safari e altri browser.
+- Scansione: libreria **[ZXing](https://github.com/zxing-js/library)** inclusa
+  nel progetto (`vendor/zxing.min.js`, nessuna dipendenza da CDN/internet),
+  usata su tutti i browser (iPhone/Safari compresi); se non si carica, ripiega
+  sull'API nativa `BarcodeDetector`.
 - Compatibilità: browser recenti su Android, iOS (Safari), Windows, macOS,
   Linux. Su iOS usa **Safari**.
 
@@ -88,6 +110,7 @@ l'indirizzo HTTPS di GitHub Pages.
 index.html              Pagina principale
 styles.css              Stile (tema chiaro/scuro automatico)
 app.js                  Logica: scansione, ricerca dati, scaffali, biblioteca
+vendor/zxing.min.js     Libreria di scansione codici a barre (inclusa)
 sw.js                   Service worker (offline)
 manifest.webmanifest    Configurazione PWA (installazione)
 icon.svg                Icona dell'app

@@ -53,12 +53,17 @@
         </div>
 
         <p class="scanner-status" id="scannerStatus"></p>
+        <p class="scanner-diag" id="scanDiag"></p>
 
         <div class="manual-entry">
           <label for="manualIsbn">Oppure inserisci l'ISBN a mano</label>
           <div class="manual-row">
             <input type="text" id="manualIsbn" inputmode="numeric" placeholder="es. 9788804707982" autocomplete="off" />
             <button id="manualBtn" class="btn btn-secondary">Cerca</button>
+          </div>
+          <div class="photo-entry">
+            <button id="photoBtn" class="btn btn-ghost" type="button">🖼️ Scatta/carica una foto del codice</button>
+            <input type="file" id="photoInput" accept="image/*" capture="environment" class="hidden" />
           </div>
         </div>
       </div>

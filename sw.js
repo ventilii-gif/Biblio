@@ -2,12 +2,13 @@
    Mette in cache il "guscio" dell'app per l'uso offline.
    Le chiamate alle API dei libri e alle copertine passano sempre dalla rete. */
 
-const CACHE = 'biblio-v1';
+const CACHE = 'biblio-v2';
 const SHELL = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './vendor/zxing.min.js',
   './icon.svg',
   './manifest.webmanifest',
 ];

@@ -205,18 +205,31 @@ async function nativeSupported() {
 async function startScanner() {
   if (scanner.active) return;
   setStatus('Avvio fotocamera…');
+  setDiag('');
   $('#startBtn').classList.add('hidden');
 
+  // Motore principale: ZXing (incluso in locale, funziona su ogni browser,
+  // iPhone/Safari compresi). Solo se la libreria non si carica si ripiega
+  // su BarcodeDetector nativo, dove disponibile.
+  let useZxing = false;
+  try { await loadZXing(); useZxing = true; }
+  catch (e) { console.warn('ZXing non caricato, provo il motore nativo:', e); }
+
   try {
-    if (await nativeSupported()) {
-      await startNative();
-    } else {
+    if (useZxing) {
       await startZXing();
+      scanner.engine = 'ZXing';
+    } else if (await nativeSupported()) {
+      await startNative();
+      scanner.engine = 'BarcodeDetector';
+    } else {
+      throw new Error('Nessun motore di scansione disponibile su questo browser.');
     }
     scanner.active = true;
     scannerEl.classList.add('live');
     $('#stopBtn').classList.remove('hidden');
-    setStatus('Fotocamera attiva — inquadra il codice a barre.');
+    setStatus('Fotocamera attiva — inquadra il codice a barre (EAN‑13) del libro.');
+    setDiag(`Motore: ${scanner.engine} · in attesa di un codice…`);
     await setupCameraExtras();
   } catch (err) {
     console.error(err);
@@ -224,17 +237,41 @@ async function startScanner() {
     let msg = 'Impossibile accedere alla fotocamera.';
     if (err && err.name === 'NotAllowedError') msg = 'Permesso fotocamera negato. Consentilo nelle impostazioni del browser.';
     else if (err && err.name === 'NotFoundError') msg = 'Nessuna fotocamera trovata su questo dispositivo.';
-    else if (location.protocol !== 'https:' && location.hostname !== 'localhost') msg = 'La fotocamera richiede una connessione sicura (HTTPS). Usa il sito pubblicato su HTTPS.';
+    else if (err && (err.name === 'NotReadableError' || err.name === 'TrackStartError')) msg = 'La fotocamera è occupata da un\'altra app. Chiudila e riprova.';
+    else if (location.protocol !== 'https:' && location.hostname !== 'localhost') msg = 'La fotocamera richiede HTTPS: apri il sito pubblicato (https://…), non il file locale.';
+    else if (err && err.message) msg = err.message;
     setStatus(msg, true);
   }
 }
 
-async function getStream(deviceId) {
-  const video = deviceId
+/** Vincoli video: fotocamera posteriore, alta risoluzione (per leggere le
+ *  righe sottili del codice) e messa a fuoco continua dove supportata. */
+function buildVideoConstraints(deviceId) {
+  const v = deviceId
     ? { deviceId: { exact: deviceId } }
     : { facingMode: { ideal: 'environment' } };
-  Object.assign(video, { width: { ideal: 1280 }, height: { ideal: 720 } });
-  return navigator.mediaDevices.getUserMedia({ video, audio: false });
+  v.width = { ideal: 1920 };
+  v.height = { ideal: 1080 };
+  // I vincoli "advanced" non supportati vengono ignorati senza errore.
+  v.advanced = [{ focusMode: 'continuous' }];
+  return v;
+}
+
+async function getStream(deviceId) {
+  return navigator.mediaDevices.getUserMedia({ video: buildVideoConstraints(deviceId), audio: false });
+}
+
+/** Costruisce gli "hint" ZXing limitati ai codici dei libri. */
+function zxingHints() {
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+    ZXing.BarcodeFormat.EAN_13,
+    ZXing.BarcodeFormat.EAN_8,
+    ZXing.BarcodeFormat.UPC_A,
+    ZXing.BarcodeFormat.UPC_E,
+  ]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+  return hints;
 }
 
 async function startNative() {
@@ -263,27 +300,14 @@ function scanLoopNative() {
 
 async function startZXing() {
   scanner.usingNative = false;
-  await loadZXing();
-  const hints = new Map();
-  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-    ZXing.BarcodeFormat.EAN_13,
-    ZXing.BarcodeFormat.EAN_8,
-    ZXing.BarcodeFormat.UPC_A,
-    ZXing.BarcodeFormat.UPC_E,
-  ]);
-  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-  scanner.zxingReader = new ZXing.BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 150 });
+  // 2° argomento = millisecondi tra un tentativo di lettura e il successivo.
+  scanner.zxingReader = new ZXing.BrowserMultiFormatReader(zxingHints(), 100);
 
-  const constraints = {
-    audio: false,
-    video: scanner.preferredDeviceId
-      ? { deviceId: { exact: scanner.preferredDeviceId } }
-      : { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-  };
+  const constraints = { audio: false, video: buildVideoConstraints(scanner.preferredDeviceId) };
 
   scanner.zxingControls = await scanner.zxingReader.decodeFromConstraints(
     constraints, videoEl,
-    (result, err) => {
+    (result) => {
       if (result) handleDetection(result.getText());
     }
   );
@@ -296,9 +320,10 @@ function loadZXing() {
   if (zxingPromise) return zxingPromise;
   zxingPromise = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Impossibile caricare la libreria di scansione (ZXing).'));
+    // Libreria inclusa nel progetto: nessuna dipendenza da internet/CDN.
+    s.src = 'vendor/zxing.min.js';
+    s.onload = () => window.ZXing ? resolve() : reject(new Error('Libreria di scansione non inizializzata.'));
+    s.onerror = () => reject(new Error('Impossibile caricare la libreria di scansione (vendor/zxing.min.js).'));
     document.head.appendChild(s);
   });
   return zxingPromise;
@@ -344,6 +369,13 @@ async function setupCameraExtras() {
   } else {
     torchBtn.classList.add('hidden');
   }
+
+  // Messa a fuoco continua, se la fotocamera la supporta (aiuta molto la lettura).
+  try {
+    if (track && caps && Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+    }
+  } catch (e) { /* non supportato: ignora */ }
 }
 
 async function switchCamera(deviceId) {
@@ -386,21 +418,66 @@ function setStatus(msg, isError) {
   el.classList.toggle('error', !!isError);
 }
 
+function setDiag(msg) {
+  const el = $('#scanDiag');
+  if (el) el.textContent = msg || '';
+}
+
 /** Chiamata quando un codice viene rilevato. */
 function handleDetection(rawValue) {
   const now = Date.now();
   const code = normalizeIsbn(rawValue);
+
   // Anti-rimbalzo: ignora lo stesso codice ripetuto entro 3s
   if (code === scanner.lastCode && now - scanner.lastTime < 3000) return;
   scanner.lastCode = code;
   scanner.lastTime = now;
 
-  if (!isValidIsbn(code)) return; // ignora codici non-ISBN (es. barcode del prezzo)
+  if (!isValidIsbn(code)) {
+    // La fotocamera legge qualcosa, ma non è un ISBN: aiuta a capire il problema.
+    setDiag(`Letto "${rawValue}" — non è un ISBN. Inquadra il codice EAN‑13 grande (inizia con 978/979), non quello del prezzo.`);
+    return;
+  }
 
   beep();
   stopScanner(true);
   setStatus('Codice rilevato: ' + code);
+  setDiag('');
   lookupAndShow(code);
+}
+
+/** Decodifica un codice da una foto scattata/caricata (utile se la webcam
+ *  del PC non mette a fuoco: si può usare una foto nitida col telefono). */
+async function decodeFromPhoto(file) {
+  if (!file) return;
+  setStatus('Analizzo la foto…');
+  setDiag('');
+  try {
+    await loadZXing();
+  } catch (e) {
+    setStatus('Motore di scansione non disponibile.', true);
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const reader = new ZXing.BrowserMultiFormatReader(zxingHints());
+    const result = await reader.decodeFromImageUrl(url);
+    const code = normalizeIsbn(result.getText());
+    if (!isValidIsbn(code)) {
+      setStatus('', false);
+      setDiag(`Nella foto ho letto "${result.getText()}", ma non è un ISBN valido.`);
+      return;
+    }
+    beep();
+    stopScanner(true);
+    setStatus('Codice riconosciuto dalla foto: ' + code);
+    lookupAndShow(code);
+  } catch (e) {
+    setStatus('', false);
+    setDiag('Nessun codice riconosciuto nella foto. Riprova più da vicino, a fuoco e ben illuminato.');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 /* ===========================================================
@@ -770,6 +847,12 @@ function bindEvents() {
 
   $('#manualBtn').addEventListener('click', doManualLookup);
   $('#manualIsbn').addEventListener('keydown', (e) => { if (e.key === 'Enter') doManualLookup(); });
+
+  $('#photoBtn').addEventListener('click', () => $('#photoInput').click());
+  $('#photoInput').addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) decodeFromPhoto(e.target.files[0]);
+    e.target.value = '';
+  });
 
   $('#saveBtn').addEventListener('click', saveCurrentBook);
   $('#scanAnotherBtn').addEventListener('click', () => { resetResult(); startScanner(); });

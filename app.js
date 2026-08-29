@@ -179,16 +179,22 @@ async function fetchBookData(isbn) {
 
 async function fetchFromGoogle(isbn, country) {
   const key = getGoogleKey();
-  const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}&country=${country}&maxResults=1`
-    + (key ? `&key=${encodeURIComponent(key)}` : '');
-  let res = await fetchWithTimeout(url);
-  // Riprova solo su errori temporanei del server (5xx). NON insistere sul 429:
-  // rifare la richiesta peggiora solo il limite. Si passa alle altre fonti.
+  const base = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}&country=${country}&maxResults=1`;
+  const build = (withKey) => base + (withKey && key ? `&key=${encodeURIComponent(key)}` : '');
+
+  let res = await fetchWithTimeout(build(true));
+  // Errori temporanei del server: un solo nuovo tentativo.
   if (res.status >= 500) {
     await sleep(800);
-    res = await fetchWithTimeout(url);
+    res = await fetchWithTimeout(build(true));
   }
-  if (res.status === 429 || res.status === 403) throw new Error('limite richieste (' + res.status + ')');
+  // Se la chiave è rifiutata (403, es. restrizione errata), la chiave è inutile:
+  // riprova SENZA chiave, così un errore di configurazione non blocca i dati.
+  if (res.status === 403 && key) {
+    res = await fetchWithTimeout(build(false));
+  }
+  if (res.status === 429) throw new Error('limite richieste (429)');
+  if (res.status === 403) throw new Error('chiave rifiutata (403)');
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
   if (!data.items || !data.items.length) return null;
@@ -617,7 +623,11 @@ async function lookupAndShow(isbn) {
   if (!data || !currentBook.title) {
     // Il CODICE è stato letto: il problema è solo il recupero dati. Chiariscilo.
     const oc = outcomes.join(' · ');
-    if (/limite richieste|429|403/i.test(oc)) {
+    if (/chiave rifiutata|403/i.test(oc)) {
+      setStatus(`✓ Codice ${isbn} letto. La chiave Google è stata rifiutata (restrizione errata). In Google Cloud → Credenziali → la tua chiave → «Restrizioni applicazione» scegli «Nessuna» oppure «Siti web» e aggiungi ventilii-gif.github.io/*`, true);
+      const s = document.querySelector('.settings');
+      if (s) { s.open = true; s.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    } else if (/limite richieste|429/i.test(oc)) {
       setStatus(`✓ Codice ${isbn} letto. Servizio dati al limite delle richieste: aggiungi una chiave Google (⚙️) o riprova tra un minuto; intanto puoi compilare a mano.`, true);
       // Se non c'è ancora una chiave, apri la sezione ⚙️ e porta l'utente al campo.
       if (!getGoogleKey()) {

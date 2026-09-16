@@ -47,6 +47,15 @@
               <option value="mista">Mista</option>
             </select>
           </label>
+          <label>Scenario tipico (riempie le rese)
+            <select id="pScenario">
+              <option value="">Personalizzato</option>
+              <option value="giovane" data-yield="8" data-oil="13">Oliveto giovane</option>
+              <option value="adulto" data-yield="20" data-oil="15">Oliveto adulto (piena produzione)</option>
+              <option value="carica" data-yield="30" data-oil="16">Annata di carica</option>
+              <option value="scarica" data-yield="10" data-oil="13">Annata di scarica</option>
+            </select>
+          </label>
           <label>Resa media per pianta (kg)
             <input type="number" id="pYield" min="0" step="any" inputmode="decimal" placeholder="20" />
           </label>
@@ -61,6 +70,9 @@
           </label>
           <label>Giorni a disposizione (facoltativo)
             <input type="number" id="pDays" min="0" step="1" inputmode="numeric" placeholder="es. 5" />
+          </label>
+          <label>Costo a persona al giorno (€, facolt.)
+            <input type="number" id="pCost" min="0" step="any" inputmode="decimal" placeholder="es. 80" />
           </label>
         </div>
 
@@ -77,6 +89,26 @@
         <h2 class="card-title">Stima della raccolta</h2>
         <div class="stat-grid" id="planStats"></div>
         <p class="plan-note" id="planNote"></p>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">🏭 Frantoio</h2>
+        <p class="muted">Prenota il turno e segna l'appuntamento: nei giorni di punta c'è coda.</p>
+        <div id="millBanner" class="coverage hidden"></div>
+        <div class="form-grid">
+          <label>Nome del frantoio
+            <input type="text" id="mName" placeholder="es. Frantoio Bianchi" autocomplete="off" />
+          </label>
+          <label>Data e ora dell'appuntamento
+            <input type="datetime-local" id="mDate" />
+          </label>
+          <label>Quantità da portare (kg)
+            <input type="number" id="mQty" min="0" step="any" inputmode="decimal" placeholder="stima automatica" />
+          </label>
+        </div>
+        <label class="full-label">Note
+          <input type="text" id="mNote" placeholder="es. molitura a freddo, contenitori da riportare…" autocomplete="off" />
+        </label>
       </div>
 
       <div class="card">
@@ -100,13 +132,14 @@
 
     <!-- ===================== TAB: MATERIALE ===================== -->
     <section id="tab-materials" class="tab-panel" role="tabpanel">
+      <div class="print-header" id="printHeader"></div>
       <div class="card">
         <h2 class="card-title">Materiale necessario</h2>
         <p class="muted">Elenco consigliato in base alle tue piante e alla squadra. Spunta ciò che hai già pronto, correggi le quantità e aggiungi le tue voci.</p>
         <div class="mat-summary" id="matSummary"></div>
         <div class="mat-toolbar">
           <button id="addMatBtn" class="btn btn-secondary">➕ Aggiungi voce</button>
-          <button id="printMatBtn" class="btn btn-ghost">🖨️ Stampa elenco</button>
+          <button id="printMatBtn" class="btn btn-ghost">🖨️ Stampa / PDF</button>
           <button id="restoreMatBtn" class="btn btn-ghost hidden">↺ Ripristina nascoste</button>
         </div>
 

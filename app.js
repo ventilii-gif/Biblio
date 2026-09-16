@@ -30,6 +30,7 @@ const DEFAULT_PLAN = {
   tppd: null,         // piante/persona/giorno (override manuale)
   startDate: '',
   targetDays: null,   // giorni a disposizione (facoltativo)
+  dailyCost: null,    // costo a persona al giorno (€, facoltativo)
 };
 
 const store = {
@@ -38,6 +39,7 @@ const store = {
   sessions: [],         // { id, date, trees, kg, people, hours, oilLiters, note, createdAt }
   materialState: {},    // { [key]: { done, qty, hidden } } — stato delle voci predefinite
   customMaterials: [],  // { id, name, icon, cat, unit, qty, note, done }
+  mill: { name: '', date: '', qty: null, note: '' }, // frantoio / appuntamento
 };
 
 function loadStore() {
@@ -50,6 +52,7 @@ function loadStore() {
     if (Array.isArray(data.sessions)) store.sessions = data.sessions;
     if (data.materialState && typeof data.materialState === 'object') store.materialState = data.materialState;
     if (Array.isArray(data.customMaterials)) store.customMaterials = data.customMaterials;
+    if (data.mill && typeof data.mill === 'object') store.mill = { ...store.mill, ...data.mill };
   } catch (e) {
     console.warn('Impossibile leggere i dati salvati:', e);
   }
@@ -92,6 +95,15 @@ function fmtDate(iso) {
   const d = new Date(iso + (iso.length === 10 ? 'T00:00:00' : ''));
   if (isNaN(d)) return iso;
   return new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'long', year: 'numeric' }).format(d);
+}
+
+function fmtDateTime(v) {
+  if (!v) return '—';
+  const d = new Date(v);
+  if (isNaN(d)) return v;
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  }).format(d);
 }
 
 function escapeHtml(str) {
@@ -137,7 +149,10 @@ function planTotals() {
   const oilL = oilKg / DENSITY_OIL;
   const tppd = treesPerPersonDay(p);
   const personDays = tppd > 0 ? trees / tppd : 0; // giornate-persona totali
-  return { trees, kgOlives, oilKg, oilL, tppd, personDays };
+  const dailyCost = Math.max(0, num(p.dailyCost));
+  const laborCost = personDays * dailyCost;
+  const costPerLiter = oilL > 0 ? laborCost / oilL : 0;
+  return { trees, kgOlives, oilKg, oilL, tppd, personDays, dailyCost, laborCost, costPerLiter };
 }
 
 /** Totali già raccolti (dal diario). */
@@ -302,6 +317,11 @@ function renderPlanStats() {
     tiles.push(stat(`${fmt(recPeople)} ${recPeople === 1 ? 'persona' : 'persone'}`, '🎯 Servono', `per finire in ${fmt(targetDays)} giorni`));
   }
 
+  if (t.dailyCost > 0) {
+    const sub = t.costPerLiter > 0 ? `≈ € ${fmt(t.costPerLiter, 2)} al litro d'olio` : `€ ${fmt(t.dailyCost)}/persona al giorno`;
+    tiles.push(stat(`€ ${fmt(t.laborCost)}`, '💶 Costo manodopera', sub, 'cost'));
+  }
+
   $('#planStats').innerHTML = tiles.join('');
   $('#planNote').innerHTML = planNoteText();
 }
@@ -327,6 +347,25 @@ function planNoteText() {
     s += `Servono circa <b>${fmt(t.personDays, 1)} giornate-persona</b>: per esempio ${four} ${four === 1 ? 'giorno' : 'giorni'} con 4 persone. Aggiungi la squadra nella scheda 👥.`;
   }
   return s;
+}
+
+function renderMill() {
+  const m = store.mill || {};
+  const t = planTotals();
+  const qtyEl = $('#mQty');
+  if (qtyEl) qtyEl.placeholder = t.kgOlives > 0 ? `stima ${fmt(t.kgOlives)} kg` : 'kg';
+
+  const banner = $('#millBanner');
+  if (!banner) return;
+  if (m.date) {
+    const q = num(m.qty) > 0 ? ` · ${fmt(num(m.qty))} kg` : '';
+    const name = m.name ? ` · ${escapeHtml(m.name)}` : '';
+    banner.className = 'coverage ok';
+    banner.innerHTML = `📅 Appuntamento: <b>${escapeHtml(fmtDateTime(m.date))}</b>${name}${q}`;
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
 }
 
 function progressHtml() {
@@ -379,6 +418,12 @@ function renderMaterials() {
   const hidden = hiddenCount();
   $('#restoreMatBtn').classList.toggle('hidden', hidden === 0);
   if (hidden > 0) $('#restoreMatBtn').textContent = `↺ Ripristina ${hidden} nascoste`;
+
+  const t = planTotals();
+  const team = teamTotals();
+  const when = fmtDate(new Date().toISOString().slice(0, 10));
+  $('#printHeader').innerHTML = `<h2>🫒 Oliveto — elenco del materiale</h2>
+    <div class="ph-sub">${fmt(t.trees)} piante · ${team.count > 0 ? team.count + ' persone' : 'squadra da definire'} · ${done}/${total} voci pronte · stampato il ${when}</div>`;
 }
 
 function matRow(i) {
@@ -497,6 +542,7 @@ function sessionRow(s) {
 function renderDerived() {
   renderCounter();
   renderPlanStats();
+  renderMill();
   renderProgress();
   renderMaterials();
   renderTeam();
@@ -517,7 +563,14 @@ function hydrateInputs() {
   $('#pHours').value = p.hoursPerDay ?? '';
   $('#pStart').value = p.startDate || '';
   $('#pDays').value = p.targetDays ?? '';
+  $('#pCost').value = p.dailyCost ?? '';
   $('#pTppd').value = p.tppd ?? '';
+  $('#pScenario').value = '';
+  const m = store.mill || {};
+  $('#mName').value = m.name || '';
+  $('#mDate').value = m.date || '';
+  $('#mQty').value = m.qty != null ? m.qty : '';
+  $('#mNote').value = m.note || '';
   // Data di default per una nuova giornata: oggi
   if (!$('#sDate').value) $('#sDate').value = new Date().toISOString().slice(0, 10);
 }
@@ -568,6 +621,7 @@ function importJson(file) {
       if (Array.isArray(data.sessions)) store.sessions = data.sessions;
       if (data.materialState && typeof data.materialState === 'object') store.materialState = data.materialState;
       if (Array.isArray(data.customMaterials)) store.customMaterials = data.customMaterials;
+      if (data.mill && typeof data.mill === 'object') store.mill = { name: '', date: '', qty: null, note: '', ...data.mill };
       saveStore();
       hydrateInputs();
       renderAll();
@@ -603,6 +657,7 @@ function wirePlan() {
   bind('#pHours', 'hoursPerDay', true);
   bind('#pStart', 'startDate', false);
   bind('#pDays', 'targetDays', true, true);
+  bind('#pCost', 'dailyCost', true, true);
   bind('#pTppd', 'tppd', true, true);
 
   $('#pMethod').addEventListener('change', (e) => {
@@ -610,6 +665,33 @@ function wirePlan() {
     saveStore();
     renderDerived();
   });
+
+  // Scenario tipico: riempie resa per pianta e resa in olio
+  $('#pScenario').addEventListener('change', (e) => {
+    const opt = e.target.selectedOptions[0];
+    if (!opt || !opt.value) return;
+    if (opt.dataset.yield != null) { store.plan.yieldPerTree = num(opt.dataset.yield); $('#pYield').value = opt.dataset.yield; }
+    if (opt.dataset.oil != null) { store.plan.oilYield = num(opt.dataset.oil); $('#pOil').value = opt.dataset.oil; }
+    saveStore();
+    renderDerived();
+  });
+  // Se l'utente modifica a mano le rese, lo scenario torna "Personalizzato"
+  $('#pYield').addEventListener('input', () => { $('#pScenario').value = ''; });
+  $('#pOil').addEventListener('input', () => { $('#pScenario').value = ''; });
+
+  // Frantoio / appuntamento
+  const bindMill = (id, key, isNumber) => {
+    $(id).addEventListener('input', (e) => {
+      const raw = e.target.value;
+      store.mill[key] = isNumber ? (raw === '' ? null : num(raw)) : raw;
+      saveStore();
+      renderMill();
+    });
+  };
+  bindMill('#mName', 'name', false);
+  bindMill('#mDate', 'date', false);
+  bindMill('#mQty', 'qty', true);
+  bindMill('#mNote', 'note', false);
 
   $('#exportJsonBtn').addEventListener('click', exportJson);
   $('#exportCsvBtn').addEventListener('click', exportCsv);
@@ -625,6 +707,7 @@ function wirePlan() {
     store.sessions = [];
     store.materialState = {};
     store.customMaterials = [];
+    store.mill = { name: '', date: '', qty: null, note: '' };
     saveStore();
     hydrateInputs();
     renderAll();

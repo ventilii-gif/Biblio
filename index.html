@@ -2,10 +2,15 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
+  <!-- Sicurezza: l'app è tutta locale (nessuna dipendenza né chiamata di rete
+       esterna), quindi si può applicare una Content Security Policy severa che
+       consente solo risorse dello stesso sito e vieta script/stili inline. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-src 'none'; object-src 'none'; form-action 'none'; upgrade-insecure-requests" />
+  <meta name="referrer" content="no-referrer" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#7c4a2d" />
-  <meta name="description" content="Gestisci la tua biblioteca di casa: scansiona il codice a barre dei libri e assegna uno scaffale." />
-  <title>Biblio — la tua biblioteca di casa</title>
+  <meta name="theme-color" content="#5a7a22" />
+  <meta name="description" content="Organizza la raccolta delle olive: piano, stima di olive e olio, elenco del materiale, squadra e diario della raccolta." />
+  <title>Oliveto — gestione della raccolta</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -14,172 +19,243 @@
 <body>
   <header class="app-header">
     <div class="brand">
-      <span class="logo" aria-hidden="true">📚</span>
+      <span class="logo" aria-hidden="true">🫒</span>
       <div>
-        <h1>Biblio</h1>
-        <p class="tagline">La tua biblioteca di casa</p>
+        <h1>Oliveto</h1>
+        <p class="tagline">Gestione della raccolta</p>
       </div>
     </div>
-    <div class="counter" id="counter" title="Libri in biblioteca">0 libri</div>
+    <div class="counter" id="counter" title="Avanzamento della raccolta">0% raccolto</div>
   </header>
 
   <nav class="tabs" role="tablist">
-    <button class="tab active" data-tab="scan" role="tab" aria-selected="true">📷 Scansiona</button>
-    <button class="tab" data-tab="library" role="tab" aria-selected="false">📚 Biblioteca</button>
+    <button class="tab active" data-tab="plan" role="tab" aria-selected="true">📋 Piano</button>
+    <button class="tab" data-tab="materials" role="tab" aria-selected="false">🧰 Materiale</button>
+    <button class="tab" data-tab="team" role="tab" aria-selected="false">👥 Squadra</button>
+    <button class="tab" data-tab="harvest" role="tab" aria-selected="false">🫒 Raccolta</button>
   </nav>
 
   <main>
-    <!-- ===================== TAB: SCANSIONA ===================== -->
-    <section id="tab-scan" class="tab-panel active" role="tabpanel">
-
-      <div class="card scanner-card">
-        <div class="scanner" id="scanner">
-          <video id="video" playsinline muted></video>
-          <div class="scan-overlay" id="scanOverlay">
-            <div class="scan-frame"></div>
-            <p class="scan-hint">Inquadra il codice a barre sul retro del libro</p>
-          </div>
-          <div class="scanner-placeholder" id="scannerPlaceholder">
-            <span class="ph-icon">📷</span>
-            <p>Premi <strong>Avvia scansione</strong> per accendere la fotocamera</p>
-          </div>
-        </div>
-
-        <div class="scanner-controls">
-          <button id="startBtn" class="btn btn-primary">▶ Avvia scansione</button>
-          <button id="stopBtn" class="btn btn-ghost hidden">■ Ferma</button>
-          <button id="torchBtn" class="btn btn-ghost hidden" title="Torcia">🔦</button>
-          <select id="cameraSelect" class="camera-select hidden" title="Cambia fotocamera" aria-label="Cambia fotocamera"></select>
-        </div>
-
-        <p class="scanner-status" id="scannerStatus"></p>
-        <p class="scanner-diag" id="scanDiag"></p>
-
-        <div class="manual-entry">
-          <label for="manualIsbn">Oppure inserisci l'ISBN a mano</label>
-          <div class="manual-row">
-            <input type="text" id="manualIsbn" inputmode="numeric" placeholder="es. 9788804707982" autocomplete="off" />
-            <button id="manualBtn" class="btn btn-secondary">Cerca</button>
-          </div>
-          <div class="photo-entry">
-            <button id="photoBtn" class="btn btn-ghost" type="button">🖼️ Scatta/carica una foto del codice</button>
-            <input type="file" id="photoInput" accept="image/*" capture="environment" class="hidden" />
-          </div>
+    <!-- ===================== TAB: PIANO ===================== -->
+    <section id="tab-plan" class="tab-panel active" role="tabpanel">
+      <div class="card">
+        <h2 class="card-title">Il tuo oliveto</h2>
+        <p class="muted">Imposta i numeri: le stime e l'elenco del materiale si aggiornano da soli.</p>
+        <div class="form-grid">
+          <label>Numero di piante
+            <input type="number" id="pTrees" min="0" step="1" inputmode="numeric" placeholder="100" />
+          </label>
+          <label>Metodo di raccolta
+            <select id="pMethod">
+              <option value="manuale">A mano (brucatura)</option>
+              <option value="agevolata">Agevolata (abbacchiatori)</option>
+              <option value="mista">Mista</option>
+            </select>
+          </label>
+          <label>Scenario tipico (riempie le rese)
+            <select id="pScenario">
+              <option value="">Personalizzato</option>
+              <option value="giovane" data-yield="8" data-oil="13">Oliveto giovane</option>
+              <option value="adulto" data-yield="20" data-oil="15">Oliveto adulto (piena produzione)</option>
+              <option value="carica" data-yield="30" data-oil="16">Annata di carica</option>
+              <option value="scarica" data-yield="10" data-oil="13">Annata di scarica</option>
+            </select>
+          </label>
+          <label>Resa media per pianta (kg)
+            <input type="number" id="pYield" min="0" step="any" inputmode="decimal" placeholder="20" />
+          </label>
+          <label>Resa in olio (%)
+            <input type="number" id="pOil" min="0" max="100" step="any" inputmode="decimal" placeholder="15" />
+          </label>
+          <label>Ore di lavoro al giorno
+            <input type="number" id="pHours" min="1" max="14" step="any" inputmode="decimal" placeholder="6" />
+          </label>
+          <label>Data d'inizio (facoltativa)
+            <input type="date" id="pStart" />
+          </label>
+          <label>Giorni a disposizione (facoltativo)
+            <input type="number" id="pDays" min="0" step="1" inputmode="numeric" placeholder="es. 5" />
+          </label>
+          <label>Costo a persona al giorno (€, facolt.)
+            <input type="number" id="pCost" min="0" step="any" inputmode="decimal" placeholder="es. 80" />
+          </label>
         </div>
 
         <details class="settings">
-          <summary>⚙️ Chiave Google Books (opzionale)</summary>
-          <p class="muted">Serve solo se vedi spesso «troppe richieste». Con una chiave gratuita il limite sparisce. I dati già trovati vengono comunque memorizzati e non richiesti di nuovo.</p>
-          <div class="manual-row">
-            <input type="text" id="googleKey" placeholder="Incolla qui la chiave (opzionale)" autocomplete="off" />
-            <button id="saveKeyBtn" class="btn btn-secondary" type="button">Salva</button>
-          </div>
-          <p class="muted">Come ottenerla: console.cloud.google.com → nuovo progetto → abilita «Books API» → Credenziali → «Chiave API».</p>
+          <summary>⚙️ Impostazioni avanzate</summary>
+          <label class="adv-label">Piante raccolte da 1 persona in 1 giorno
+            <input type="number" id="pTppd" min="0" step="any" inputmode="decimal" placeholder="automatico" />
+          </label>
+          <p class="muted">Lascia vuoto per usare la stima automatica in base al metodo (ora: <b id="tppdAuto">—</b> piante/persona al giorno).</p>
         </details>
       </div>
 
-      <!-- Scheda risultato / inserimento -->
-      <div class="card result-card hidden" id="resultCard">
-        <div class="result-loading hidden" id="resultLoading">
-          <div class="spinner"></div>
-          <p>Cerco i dati del libro…</p>
-        </div>
-
-        <div class="result-body hidden" id="resultBody">
-          <div class="book-preview">
-            <img id="bookCover" class="book-cover" alt="Copertina" />
-            <div class="book-fields">
-              <label>Titolo
-                <input type="text" id="fTitle" placeholder="Titolo del libro" />
-              </label>
-              <label>Autore/i
-                <input type="text" id="fAuthors" placeholder="Autore" />
-              </label>
-              <div class="field-grid">
-                <label>Editore
-                  <input type="text" id="fPublisher" placeholder="Editore" />
-                </label>
-                <label>Anno
-                  <input type="text" id="fYear" placeholder="Anno" inputmode="numeric" />
-                </label>
-              </div>
-              <label>ISBN
-                <input type="text" id="fIsbn" placeholder="ISBN" readonly />
-              </label>
-            </div>
-          </div>
-
-          <div class="online-lookup hidden" id="onlineLookup">
-            <p>Dati non trovati in automatico? Cerca l'ISBN online e copia titolo/autore:</p>
-            <div class="online-links">
-              <a id="linkBookfinder" href="#" target="_blank" rel="noopener">🔎 BookFinder</a>
-              <a id="linkGoogleBooks" href="#" target="_blank" rel="noopener">🔎 Google Libri</a>
-            </div>
-          </div>
-
-          <div class="shelf-section">
-            <label for="fShelf" class="shelf-label">🗂️ Scaffale</label>
-            <input type="text" id="fShelf" list="shelfOptions" placeholder="Scegli o scrivi lo scaffale…" autocomplete="off" />
-            <datalist id="shelfOptions"></datalist>
-            <p class="shelf-help">Scegli uno scaffale già usato dal menù, oppure scrivine uno nuovo: verrà memorizzato.</p>
-          </div>
-
-          <div class="result-actions">
-            <button id="saveBtn" class="btn btn-primary">💾 Salva in biblioteca</button>
-            <button id="scanAnotherBtn" class="btn btn-ghost">↻ Scansiona un altro</button>
-          </div>
-          <p class="dup-note hidden" id="dupNote"></p>
-        </div>
+      <div class="card estimate-card">
+        <h2 class="card-title">Stima della raccolta</h2>
+        <div class="stat-grid" id="planStats"></div>
+        <p class="plan-note" id="planNote"></p>
       </div>
-    </section>
 
-    <!-- ===================== TAB: BIBLIOTECA ===================== -->
-    <section id="tab-library" class="tab-panel" role="tabpanel">
       <div class="card">
-        <div class="library-toolbar">
-          <input type="search" id="searchInput" placeholder="🔎 Cerca per titolo, autore o ISBN…" />
-          <div class="toolbar-row">
-            <select id="shelfFilter" aria-label="Filtra per scaffale">
-              <option value="">Tutti gli scaffali</option>
-            </select>
-            <select id="sortSelect" aria-label="Ordina">
-              <option value="recent">Più recenti</option>
-              <option value="title">Titolo A→Z</option>
-              <option value="author">Autore A→Z</option>
-              <option value="shelf">Scaffale</option>
-            </select>
-          </div>
+        <h2 class="card-title">🏭 Frantoio</h2>
+        <p class="muted">Prenota il turno e segna l'appuntamento: nei giorni di punta c'è coda.</p>
+        <div id="millBanner" class="coverage hidden"></div>
+        <div class="form-grid">
+          <label>Nome del frantoio
+            <input type="text" id="mName" placeholder="es. Frantoio Bianchi" autocomplete="off" />
+          </label>
+          <label>Data e ora dell'appuntamento
+            <input type="datetime-local" id="mDate" />
+          </label>
+          <label>Quantità da portare (kg)
+            <input type="number" id="mQty" min="0" step="any" inputmode="decimal" placeholder="stima automatica" />
+          </label>
         </div>
-
-        <div class="library-stats" id="libraryStats"></div>
+        <label class="full-label">Note
+          <input type="text" id="mNote" placeholder="es. molitura a freddo, contenitori da riportare…" autocomplete="off" />
+        </label>
       </div>
 
-      <div id="libraryList" class="library-list"></div>
-
-      <div class="empty-state hidden" id="emptyState">
-        <span class="empty-icon">📭</span>
-        <p>La tua biblioteca è vuota.</p>
-        <p class="muted">Vai su <strong>Scansiona</strong> e aggiungi il primo libro!</p>
+      <div class="card">
+        <h2 class="card-title">Avanzamento</h2>
+        <div id="planProgress"></div>
+        <button class="btn btn-secondary full" data-goto="harvest">🫒 Vai al diario della raccolta</button>
       </div>
 
       <div class="card backup-card">
         <h3>Backup e dati</h3>
-        <p class="muted">I libri sono salvati solo su questo dispositivo. Esporta un backup per non perderli.</p>
+        <p class="muted">Tutto è salvato solo su questo dispositivo. Esporta un backup per non perdere nulla se cambi telefono o browser.</p>
         <div class="backup-actions">
-          <button id="exportJsonBtn" class="btn btn-secondary">⬇ Esporta (JSON)</button>
-          <button id="exportCsvBtn" class="btn btn-secondary">⬇ Esporta (CSV)</button>
-          <button id="importBtn" class="btn btn-secondary">⬆ Importa</button>
+          <button id="exportJsonBtn" class="btn btn-secondary">⬇ Esporta backup</button>
+          <button id="exportCsvBtn" class="btn btn-secondary">⬇ Raccolta in CSV</button>
+          <button id="importBtn" class="btn btn-secondary">⬆ Importa backup</button>
           <input type="file" id="importFile" accept="application/json,.json" class="hidden" />
         </div>
+        <button id="resetBtn" class="btn btn-ghost danger-ghost">🗑️ Azzera tutto</button>
+      </div>
+    </section>
+
+    <!-- ===================== TAB: MATERIALE ===================== -->
+    <section id="tab-materials" class="tab-panel" role="tabpanel">
+      <div class="print-header" id="printHeader"></div>
+      <div class="card">
+        <h2 class="card-title">Materiale necessario</h2>
+        <p class="muted">Elenco consigliato in base alle tue piante e alla squadra. Spunta ciò che hai già pronto, correggi le quantità e aggiungi le tue voci.</p>
+        <div class="mat-summary" id="matSummary"></div>
+        <div class="mat-toolbar">
+          <button id="addMatBtn" class="btn btn-secondary">➕ Aggiungi voce</button>
+          <button id="printMatBtn" class="btn btn-ghost">🖨️ Stampa / PDF</button>
+          <button id="restoreMatBtn" class="btn btn-ghost hidden">↺ Ripristina nascoste</button>
+        </div>
+
+        <form id="matForm" class="inline-form hidden">
+          <input type="text" id="mfName" placeholder="Cosa serve" autocomplete="off" />
+          <div class="inline-row">
+            <input type="number" id="mfQty" min="0" step="any" inputmode="decimal" placeholder="Q.tà" class="qty-in" />
+            <input type="text" id="mfUnit" placeholder="unità" class="unit-in" autocomplete="off" />
+            <select id="mfCat">
+              <option value="raccolta">Attrezzi di raccolta</option>
+              <option value="trasporto">Contenitori e trasporto</option>
+              <option value="sicurezza">Persone e sicurezza</option>
+              <option value="organizzazione" selected>Meteo e organizzazione</option>
+            </select>
+          </div>
+          <input type="text" id="mfNote" placeholder="Nota (facoltativa)" autocomplete="off" />
+          <div class="inline-actions">
+            <button type="submit" class="btn btn-primary">Aggiungi</button>
+            <button type="button" id="mfCancel" class="btn btn-ghost">Annulla</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="matList" class="mat-list"></div>
+    </section>
+
+    <!-- ===================== TAB: SQUADRA ===================== -->
+    <section id="tab-team" class="tab-panel" role="tabpanel">
+      <div class="card">
+        <h2 class="card-title">La squadra</h2>
+        <div class="team-summary" id="teamSummary"></div>
+
+        <form id="personForm" class="inline-form">
+          <input type="text" id="npName" placeholder="Nome" autocomplete="off" />
+          <div class="inline-row">
+            <input type="text" id="npRole" list="roleOptions" placeholder="Ruolo" autocomplete="off" />
+            <input type="number" id="npDays" min="0" step="any" inputmode="decimal" placeholder="Giorni" class="qty-in" />
+          </div>
+          <datalist id="roleOptions">
+            <option value="Raccoglitore/trice"></option>
+            <option value="Addetto/a agli abbacchiatori"></option>
+            <option value="Trasporto"></option>
+            <option value="Logistica e cucina"></option>
+            <option value="Responsabile"></option>
+          </datalist>
+          <input type="tel" id="npPhone" placeholder="Telefono (facoltativo)" autocomplete="off" />
+          <div class="inline-actions">
+            <button type="submit" class="btn btn-primary">➕ Aggiungi persona</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="teamList" class="team-list"></div>
+
+      <div class="empty-state hidden" id="teamEmpty">
+        <span class="empty-icon">👥</span>
+        <p>Nessuno nella squadra.</p>
+        <p class="muted">Aggiungi chi ti dà una mano: l'app calcola quante persone servono.</p>
+      </div>
+    </section>
+
+    <!-- ===================== TAB: RACCOLTA ===================== -->
+    <section id="tab-harvest" class="tab-panel" role="tabpanel">
+      <div class="card">
+        <h2 class="card-title">Segna una giornata</h2>
+        <p class="muted">Ogni volta che raccogli, annota com'è andata: l'avanzamento si aggiorna da solo.</p>
+        <form id="sessionForm">
+          <div class="form-grid">
+            <label>Data
+              <input type="date" id="sDate" />
+            </label>
+            <label>Piante raccolte
+              <input type="number" id="sTrees" min="0" step="1" inputmode="numeric" placeholder="0" />
+            </label>
+            <label>Olive raccolte (kg)
+              <input type="number" id="sKg" min="0" step="any" inputmode="decimal" placeholder="0" />
+            </label>
+            <label>Persone presenti
+              <input type="number" id="sPeople" min="0" step="1" inputmode="numeric" placeholder="0" />
+            </label>
+            <label>Ore lavorate
+              <input type="number" id="sHours" min="0" step="any" inputmode="decimal" placeholder="0" />
+            </label>
+            <label>Olio ottenuto (L, facolt.)
+              <input type="number" id="sOil" min="0" step="any" inputmode="decimal" placeholder="0" />
+            </label>
+          </div>
+          <label class="full-label">Note
+            <input type="text" id="sNote" placeholder="es. frantoio prenotato, pioggia nel pomeriggio…" autocomplete="off" />
+          </label>
+          <button type="submit" class="btn btn-primary full">💾 Salva giornata</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Avanzamento</h2>
+        <div id="harvestProgress"></div>
+      </div>
+
+      <div id="sessionList" class="session-list"></div>
+
+      <div class="empty-state hidden" id="sessionEmpty">
+        <span class="empty-icon">🫒</span>
+        <p>Ancora nessuna giornata registrata.</p>
+        <p class="muted">Registra la prima raccolta qui sopra.</p>
       </div>
     </section>
   </main>
 
   <!-- Toast di conferma -->
   <div class="toast hidden" id="toast"></div>
-
-  <!-- Datalist condivisa per gli scaffali nella biblioteca (modifica inline) -->
-  <datalist id="shelfOptionsLibrary"></datalist>
 
   <script src="app.js" defer></script>
 </body>

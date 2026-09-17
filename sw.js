@@ -1,16 +1,15 @@
-/* Service worker di Biblio.
+/* Service worker di Oliveto.
    Strategia "network-first" per i file dell'app: quando c'è connessione
    viene servita sempre la versione più recente (così gli aggiornamenti
    arrivano subito), con ricaduta sulla cache quando si è offline.
-   Le chiamate alle API dei libri e alle copertine passano sempre dalla rete. */
+   L'app è completamente locale: non ci sono chiamate a servizi esterni. */
 
-const CACHE = 'biblio-v3';
+const CACHE = 'oliveto-v1';
 const SHELL = [
   './',
   './index.html',
   './styles.css',
   './app.js',
-  './vendor/zxing.min.js',
   './icon.svg',
   './manifest.webmanifest',
 ];

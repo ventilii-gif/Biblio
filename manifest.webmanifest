@@ -1,13 +1,13 @@
 {
-  "name": "Biblio — la tua biblioteca di casa",
-  "short_name": "Biblio",
-  "description": "Scansiona il codice a barre dei tuoi libri, recupera i dati e organizzali per scaffale.",
+  "name": "Oliveto — gestione della raccolta",
+  "short_name": "Oliveto",
+  "description": "Organizza la raccolta delle olive: stima di olive e olio, elenco del materiale, squadra e diario.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f5efe6",
-  "theme_color": "#7c4a2d",
+  "background_color": "#f3f2e7",
+  "theme_color": "#5a7a22",
   "lang": "it",
   "icons": [
     {

@@ -383,7 +383,7 @@ function bar(label, value, total, valueText, cls = '') {
   const pct = total > 0 ? Math.min(100, (value / total) * 100) : 0;
   return `<div class="prog">
     <div class="prog-head"><span>${escapeHtml(label)}</span><span class="val">${escapeHtml(valueText)}</span></div>
-    <div class="prog-bar"><div class="prog-fill ${cls}" style="width:${pct}%"></div></div>
+    <div class="prog-bar"><div class="prog-fill ${cls}" data-pct="${pct}"></div></div>
   </div>`;
 }
 
@@ -391,6 +391,9 @@ function renderProgress() {
   const html = progressHtml();
   $('#planProgress').innerHTML = html;
   $('#harvestProgress').innerHTML = html;
+  // Larghezza impostata via JS (CSSOM) per non usare stili inline nell'HTML:
+  // così la Content Security Policy può vietare gli stili inline.
+  $$('.prog-fill').forEach(el => { el.style.width = (Number(el.dataset.pct) || 0) + '%'; });
 }
 
 function renderMaterials() {

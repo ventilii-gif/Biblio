@@ -2,6 +2,11 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
+  <!-- Sicurezza: l'app è tutta locale (nessuna dipendenza né chiamata di rete
+       esterna), quindi si può applicare una Content Security Policy severa che
+       consente solo risorse dello stesso sito e vieta script/stili inline. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-src 'none'; object-src 'none'; form-action 'none'; upgrade-insecure-requests" />
+  <meta name="referrer" content="no-referrer" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#5a7a22" />
   <meta name="description" content="Organizza la raccolta delle olive: piano, stima di olive e olio, elenco del materiale, squadra e diario della raccolta." />

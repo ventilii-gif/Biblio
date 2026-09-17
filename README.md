@@ -72,6 +72,22 @@ Poi apri `http://localhost:8000`.
 - Cambiando browser/dispositivo o cancellando i dati del sito perderai tutto:
   usa **Esporta backup** per conservarne una copia.
 
+## 🔐 Sicurezza
+
+L'app è pensata per essere servita in modo sicuro:
+
+- **HTTPS**: pubblicata su GitHub Pages viaggia sempre su HTTPS (attiva anche
+  *Settings → Pages → Enforce HTTPS*).
+- **Content Security Policy severa**: la pagina consente **solo** risorse dello
+  stesso sito e **vieta script e stili inline**, l'esecuzione di codice
+  arbitrario (`eval`) e l'incorporamento in `iframe`/oggetti esterni. Poiché
+  l'app non usa librerie esterne né chiamate di rete, la policy è molto stretta.
+- **Nessun dato in uscita**: i dati restano nel browser (localStorage); non ci
+  sono richieste verso server esterni e la policy `referrer` è impostata su
+  *no-referrer*.
+- **Input trattati in sicurezza**: tutti i testi inseriti vengono "escapati"
+  prima di essere mostrati, per evitare iniezioni di codice (XSS).
+
 ## 🛠️ Dettagli tecnici
 
 - Sito statico: `HTML` + `CSS` + `JavaScript`, nessun build necessario, nessuna
